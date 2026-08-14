@@ -12,7 +12,7 @@ import numpy as np
 import shap
 import lime.lime_tabular
 
-# Plot handlingP
+# Plot handling
 import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
