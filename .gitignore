@@ -11,6 +11,7 @@ __pycache__/
 *$py.class
 .pytest_cache/
 *.pkl
+!backend/models/*.pkl
 
 # React & Build
 frontend/node_modules/

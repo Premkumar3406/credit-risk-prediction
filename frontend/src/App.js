@@ -197,8 +197,10 @@ function App() {
     };
 
     try {
+      const API_BASE = window.location.origin.includes(":3000") ? "http://127.0.0.1:8000" : "";
+
       /* ---------- 1. PREDICT ---------- */
-      const response = await fetch("http://127.0.0.1:8000/predict", {
+      const response = await fetch(`${API_BASE}/predict`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(formattedPayload),
@@ -214,7 +216,7 @@ function App() {
 
       /* ---------- 2. SHAP ---------- */
       try {
-        const shapRes = await fetch("http://127.0.0.1:8000/shap", {
+        const shapRes = await fetch(`${API_BASE}/shap`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(formattedPayload),
@@ -229,7 +231,7 @@ function App() {
 
       /* ---------- 3. LIME ---------- */
       try {
-        const limeRes = await fetch("http://127.0.0.1:8000/lime", {
+        const limeRes = await fetch(`${API_BASE}/lime`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(formattedPayload),
@@ -244,7 +246,7 @@ function App() {
 
       /* ---------- 4. COUNTERFACTUAL ---------- */
       try {
-        const cfRes = await fetch("http://127.0.0.1:8000/counterfactual", {
+        const cfRes = await fetch(`${API_BASE}/counterfactual`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(formattedPayload),

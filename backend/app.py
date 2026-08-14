@@ -1,5 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse
 from pydantic import BaseModel
 import joblib
 import os
@@ -138,8 +140,8 @@ def fig_to_base64(fig):
 # ---------------------------
 # ROUTES
 # ---------------------------
-@app.get("/")
-def root():
+@app.get("/health")
+def health():
     return {"status": "API running"}
 
 # ---------------------------
@@ -322,4 +324,12 @@ def counterfactual(data: InputData):
         suggestions.append("Profile is already low risk. No major changes required.")
 
     return {"suggestions": suggestions}
+
+
+# ---------------------------
+# SERVE FRONTEND STATIC FILES
+# ---------------------------
+FRONTEND_BUILD_DIR = os.path.abspath(os.path.join(BASE_DIR, "..", "frontend", "build"))
+if os.path.exists(FRONTEND_BUILD_DIR):
+    app.mount("/", StaticFiles(directory=FRONTEND_BUILD_DIR, html=True), name="frontend")
 
