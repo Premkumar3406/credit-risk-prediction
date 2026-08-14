@@ -190,66 +190,8 @@ def shap_explain(data: InputData):
     return {"shap_plot": fig_to_base64(fig)}
 
 # ---------------------------
-# LIME
+# LIME EXPLANATIONS
 # ---------------------------
-# FEATURE_LABELS = {
-#     "person_age": "Applicant age",
-#     "person_income": "Annual income",
-#     "person_home_ownership": "Home ownership status",
-#     "person_emp_length": "Employment stability",
-#     "loan_intent": "Loan purpose",
-#     "loan_amnt": "Loan amount",
-#     "loan_int_rate": "Interest rate",
-#     "cb_person_cred_hist_length": "Credit history length",
-# }
-
-# def strength_word(weight: float) -> str:
-#     w = abs(weight)
-#     if w < 0.05:
-#         return "slightly"
-#     elif w < 0.15:
-#         return "moderately"
-#     else:
-#         return "strongly"
-
-# @app.post("/lime")
-# def lime_explain(data: InputData):
-#     input_dict = engineer_features(encode_categorical(data.dict()))
-#     df = pd.DataFrame([input_dict])[feature_columns]
-#     X_scaled = scaler.transform(df)
-
-#     explainer = lime.lime_tabular.LimeTabularExplainer(
-#         training_data=X_scaled,
-#         feature_names=feature_columns,
-#         class_names=["No Default", "Default"],
-#         mode="classification",
-#     )
-
-#     exp = explainer.explain_instance(
-#         X_scaled[0],
-#         model.predict_proba,
-#         num_features=5,
-#     )
-
-#     readable_explanations = []
-
-#     for feature_rule, weight in exp.as_list():
-#         raw_feature = feature_rule.split(" ")[0]
-#         label = FEATURE_LABELS.get(raw_feature, raw_feature)
-
-#         strength = strength_word(weight)
-
-#         if weight > 0:
-#             sentence = f"{label} {strength} increases the credit risk"
-#         else:
-#             sentence = f"{label} {strength} reduces the credit risk"
-
-#         readable_explanations.append(sentence)
-
-#     return {
-#         "lime_explanation": readable_explanations
-#     }
-
 @app.post("/lime")
 def lime_explain(data: InputData):
 
