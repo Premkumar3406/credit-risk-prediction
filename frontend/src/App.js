@@ -197,70 +197,72 @@ function App() {
     };
 
     try {
-      const isLocalHost = window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1";
+      const isGitHubPages = window.location.hostname.includes("github.io");
       const API_BASE = window.location.origin.includes(":8000") ? "" : "http://127.0.0.1:8000";
 
       let predictionData = null;
 
-      /* ---------- 1. PREDICT via FastAPI Backend ---------- */
-      try {
-        const response = await fetch(`${API_BASE}/predict`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(formattedPayload),
-        });
+      /* ---------- 1. PREDICT via FastAPI Backend (Only if NOT on static GitHub Pages) ---------- */
+      if (!isGitHubPages) {
+        try {
+          const response = await fetch(`${API_BASE}/predict`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(formattedPayload),
+          });
 
-        if (response.ok) {
-          predictionData = await response.json();
-          setResult(predictionData);
+          if (response.ok) {
+            predictionData = await response.json();
+            setResult(predictionData);
 
-          /* ---------- 2. SHAP ---------- */
-          try {
-            const shapRes = await fetch(`${API_BASE}/shap`, {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify(formattedPayload),
-            });
-            if (shapRes.ok) {
-              const shapJson = await shapRes.json();
-              setShapImg(shapJson.shap_plot);
+            /* ---------- 2. SHAP ---------- */
+            try {
+              const shapRes = await fetch(`${API_BASE}/shap`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(formattedPayload),
+              });
+              if (shapRes.ok) {
+                const shapJson = await shapRes.json();
+                setShapImg(shapJson.shap_plot);
+              }
+            } catch (e) {
+              console.warn("SHAP explanation failed:", e);
             }
-          } catch (e) {
-            console.warn("SHAP explanation failed:", e);
-          }
 
-          /* ---------- 3. LIME ---------- */
-          try {
-            const limeRes = await fetch(`${API_BASE}/lime`, {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify(formattedPayload),
-            });
-            if (limeRes.ok) {
-              const limeJson = await limeRes.json();
-              setLimeData(limeJson.lime_explanation || []);
+            /* ---------- 3. LIME ---------- */
+            try {
+              const limeRes = await fetch(`${API_BASE}/lime`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(formattedPayload),
+              });
+              if (limeRes.ok) {
+                const limeJson = await limeRes.json();
+                setLimeData(limeJson.lime_explanation || []);
+              }
+            } catch (e) {
+              console.warn("LIME explanation failed:", e);
             }
-          } catch (e) {
-            console.warn("LIME explanation failed:", e);
-          }
 
-          /* ---------- 4. COUNTERFACTUAL ---------- */
-          try {
-            const cfRes = await fetch(`${API_BASE}/counterfactual`, {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify(formattedPayload),
-            });
-            if (cfRes.ok) {
-              const cfJson = await cfRes.json();
-              setCounterfactuals(cfJson.suggestions || []);
+            /* ---------- 4. COUNTERFACTUAL ---------- */
+            try {
+              const cfRes = await fetch(`${API_BASE}/counterfactual`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(formattedPayload),
+              });
+              if (cfRes.ok) {
+                const cfJson = await cfRes.json();
+                setCounterfactuals(cfJson.suggestions || []);
+              }
+            } catch (e) {
+              console.warn("Counterfactual generator failed:", e);
             }
-          } catch (e) {
-            console.warn("Counterfactual generator failed:", e);
           }
+        } catch (err) {
+          console.warn("Backend API not directly reachable over HTTP, switching to client-side credit engine:", err);
         }
-      } catch (err) {
-        console.warn("Backend API not directly reachable over HTTP, switching to client-side credit engine:", err);
       }
 
       /* ---------- 5. Client-Side Fallback Engine (for GitHub Pages Live Demo) ---------- */
