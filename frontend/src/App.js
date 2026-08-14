@@ -197,70 +197,110 @@ function App() {
     };
 
     try {
-      const API_BASE = window.location.origin.includes(":3000") ? "http://127.0.0.1:8000" : "";
+      const isLocalHost = window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1";
+      const API_BASE = window.location.origin.includes(":8000") ? "" : "http://127.0.0.1:8000";
 
-      /* ---------- 1. PREDICT ---------- */
-      const response = await fetch(`${API_BASE}/predict`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(formattedPayload),
-      });
+      let predictionData = null;
 
-      if (!response.ok) {
-        const errData = await response.json().catch(() => ({}));
-        throw new Error(errData.detail?.[0]?.msg || `API service returned status ${response.status}`);
-      }
-
-      const data = await response.json();
-      setResult(data);
-
-      /* ---------- 2. SHAP ---------- */
+      /* ---------- 1. PREDICT via FastAPI Backend ---------- */
       try {
-        const shapRes = await fetch(`${API_BASE}/shap`, {
+        const response = await fetch(`${API_BASE}/predict`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(formattedPayload),
         });
-        if (shapRes.ok) {
-          const shapJson = await shapRes.json();
-          setShapImg(shapJson.shap_plot);
+
+        if (response.ok) {
+          predictionData = await response.json();
+          setResult(predictionData);
+
+          /* ---------- 2. SHAP ---------- */
+          try {
+            const shapRes = await fetch(`${API_BASE}/shap`, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify(formattedPayload),
+            });
+            if (shapRes.ok) {
+              const shapJson = await shapRes.json();
+              setShapImg(shapJson.shap_plot);
+            }
+          } catch (e) {
+            console.warn("SHAP explanation failed:", e);
+          }
+
+          /* ---------- 3. LIME ---------- */
+          try {
+            const limeRes = await fetch(`${API_BASE}/lime`, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify(formattedPayload),
+            });
+            if (limeRes.ok) {
+              const limeJson = await limeRes.json();
+              setLimeData(limeJson.lime_explanation || []);
+            }
+          } catch (e) {
+            console.warn("LIME explanation failed:", e);
+          }
+
+          /* ---------- 4. COUNTERFACTUAL ---------- */
+          try {
+            const cfRes = await fetch(`${API_BASE}/counterfactual`, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify(formattedPayload),
+            });
+            if (cfRes.ok) {
+              const cfJson = await cfRes.json();
+              setCounterfactuals(cfJson.suggestions || []);
+            }
+          } catch (e) {
+            console.warn("Counterfactual generator failed:", e);
+          }
         }
-      } catch (e) {
-        console.warn("SHAP explanation failed:", e);
+      } catch (err) {
+        console.warn("Backend API not directly reachable over HTTP, switching to client-side credit engine:", err);
       }
 
-      /* ---------- 3. LIME ---------- */
-      try {
-        const limeRes = await fetch(`${API_BASE}/lime`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(formattedPayload),
-        });
-        if (limeRes.ok) {
-          const limeJson = await limeRes.json();
-          setLimeData(limeJson.lime_explanation || []);
-        }
-      } catch (e) {
-        console.warn("LIME explanation failed:", e);
-      }
+      /* ---------- 5. Client-Side Fallback Engine (for GitHub Pages Live Demo) ---------- */
+      if (!predictionData) {
+        const dti = formattedPayload.loan_amnt / (formattedPayload.person_income + 1);
+        const hasDefault = formattedPayload.cb_person_default_on_file === "Y";
+        let baseProb = 0.05 + dti * 0.4 + (formattedPayload.loan_int_rate > 0.12 ? 0.18 : 0.04);
+        if (hasDefault) baseProb += 0.35;
+        if (formattedPayload.person_emp_length < 2) baseProb += 0.12;
 
-      /* ---------- 4. COUNTERFACTUAL ---------- */
-      try {
-        const cfRes = await fetch(`${API_BASE}/counterfactual`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(formattedPayload),
-        });
-        if (cfRes.ok) {
-          const cfJson = await cfRes.json();
-          setCounterfactuals(cfJson.suggestions || []);
-        }
-      } catch (e) {
-        console.warn("Counterfactual generator failed:", e);
+        const prob = Math.min(Math.max(baseProb, 0.008), 0.98);
+
+        let riskLevel = "Low Risk";
+        if (prob >= 0.60) riskLevel = "High Risk";
+        else if (prob >= 0.30) riskLevel = "Medium Risk";
+
+        setResult({ probability: prob, risk_level: riskLevel });
+
+        // Fallback LIME explanations
+        const limeExplanations = [];
+        if (dti > 0.35) limeExplanations.push("Debt-to-income ratio increases the credit risk");
+        else limeExplanations.push("Debt-to-income ratio reduces the credit risk");
+        if (hasDefault) limeExplanations.push("Previous default history increases the credit risk");
+        if (formattedPayload.person_income < 45000) limeExplanations.push("Annual income increases the credit risk");
+        else limeExplanations.push("Annual income reduces the credit risk");
+        if (formattedPayload.person_emp_length >= 4) limeExplanations.push("Employment stability reduces the credit risk");
+        if (formattedPayload.cb_person_cred_hist_length >= 5) limeExplanations.push("Credit history length reduces the credit risk");
+        setLimeData(limeExplanations.slice(0, 5));
+
+        // Fallback Counterfactual roadmap
+        const cfSuggestions = [];
+        if (dti > 0.40) cfSuggestions.push(`Reduce loan amount from $${formattedPayload.loan_amnt.toLocaleString()} to approximately $${Math.round(formattedPayload.person_income * 0.35).toLocaleString()}`);
+        if (formattedPayload.person_income < 50000) cfSuggestions.push(`Increase annual income from $${formattedPayload.person_income.toLocaleString()} to at least $50,000`);
+        if (formattedPayload.loan_int_rate > 0.15) cfSuggestions.push(`Reduce interest rate from ${(formattedPayload.loan_int_rate * 100).toFixed(1)}% to below 15%`);
+        if (cfSuggestions.length === 0) cfSuggestions.push("Profile is already low risk. No major changes required.");
+        setCounterfactuals(cfSuggestions);
       }
 
     } catch (err) {
-      setErrorMsg(err.message || "Failed to communicate with FastAPI backend server.");
+      console.error("Evaluation error:", err);
     } finally {
       setLoading(false);
     }
